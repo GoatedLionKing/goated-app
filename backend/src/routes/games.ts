@@ -35,6 +35,7 @@ gamesRoutes.get("/api/games", async (c) => {
   } catch (error) {
     return c.json({
       error: error instanceof Error ? error.message : String(error),
+      databaseUrlPresent: Boolean(process.env.DATABASE_URL),
     }, 500);
   }
 
