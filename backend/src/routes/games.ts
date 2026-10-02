@@ -23,13 +23,20 @@ gamesRoutes.get("/api/games", async (c) => {
     conditions.push("featured = true");
   }
 
-  const result = await query(
+  let result;
+  try {
+    result = await query(
     `select *
      from games
      where ${conditions.join(" and ")}
      order by featured desc, created_at desc`,
     values,
-  );
+    );
+  } catch (error) {
+    return c.json({
+      error: error instanceof Error ? error.message : String(error),
+    }, 500);
+  }
 
   return c.json({ games: result.rows });
 });
