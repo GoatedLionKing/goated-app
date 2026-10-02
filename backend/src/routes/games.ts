@@ -1,7 +1,8 @@
 import { Hono } from "hono";
+import type { Env } from "../lib/env.js";
 import { query } from "../lib/db.js";
 
-export const gamesRoutes = new Hono();
+export const gamesRoutes = new Hono<Env>();
 
 gamesRoutes.get("/api/games", async (c) => {
   const search = c.req.query("search");

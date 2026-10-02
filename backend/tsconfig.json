@@ -7,7 +7,14 @@
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["@cloudflare/workers-types"]
   },
-  "include": ["src"]
+  "include": [
+    "src/worker.ts",
+    "src/lib/**/*.ts",
+    "src/routes/auth.ts",
+    "src/routes/games.ts",
+    "src/routes/owner.ts"
+  ]
 }

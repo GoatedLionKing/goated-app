@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+import type { Env } from "../lib/env.js";
 import { query } from "../lib/db.js";
+import { createToken } from "../lib/auth.js";
 
 const encoder = new TextEncoder();
 
@@ -56,7 +58,7 @@ async function verifyPassword(password: string, stored: string) {
   return difference === 0;
 }
 
-export const authRoutes = new Hono();
+export const authRoutes = new Hono<Env>();
 
 authRoutes.post("/api/auth/login", async (c) => {
   try {
@@ -97,8 +99,16 @@ authRoutes.post("/api/auth/login", async (c) => {
       return c.json({ error: "Invalid credentials" }, 401);
     }
 
+    const secret = c.env.JWT_SECRET;
+    if (!secret) {
+      return c.json({ error: "JWT secret is not configured" }, 500);
+    }
+
+    const token = await createToken(owner.id, secret);
+
     return c.json({
       ok: true,
+      token,
       owner: {
         id: owner.id,
         email: owner.email,
