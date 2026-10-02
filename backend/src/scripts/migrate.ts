@@ -5,7 +5,7 @@ import { query, pool } from "../lib/db.js";
 
 const sqlPath = resolve(
   process.cwd(),
-  "../database/001_initial.sql",
+  "database/001_initial.sql",
 );
 
 const sql = await readFile(sqlPath, "utf8");
