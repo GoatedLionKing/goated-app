@@ -1,6 +1,61 @@
 import { Hono } from "hono";
 import { query } from "../lib/db.js";
 
+const encoder = new TextEncoder();
+
+function base64ToBytes(value: string) {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+async function verifyPassword(password: string, stored: string) {
+  const parts = stored.split("$");
+
+  if (parts.length !== 5 || parts[0] !== "pbkdf2" || parts[1] !== "sha256") {
+    return false;
+  }
+
+  const iterations = Number(parts[2]);
+  if (!Number.isFinite(iterations) || iterations < 1) {
+    return false;
+  }
+
+  const salt = base64ToBytes(parts[3]);
+  const expected = base64ToBytes(parts[4]);
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations,
+      hash: "SHA-256",
+    },
+    key,
+    expected.length * 8,
+  );
+
+  const actual = new Uint8Array(bits);
+
+  if (actual.length !== expected.length) {
+    return false;
+  }
+
+  let difference = 0;
+  for (let i = 0; i < actual.length; i++) {
+    difference |= actual[i] ^ expected[i];
+  }
+
+  return difference === 0;
+}
+
 export const authRoutes = new Hono();
 
 authRoutes.post("/api/auth/login", async (c) => {
@@ -36,7 +91,9 @@ authRoutes.post("/api/auth/login", async (c) => {
       password_hash: string;
     };
 
-    if (password !== owner.password_hash) {
+    const valid = await verifyPassword(password, owner.password_hash);
+
+    if (!valid) {
       return c.json({ error: "Invalid credentials" }, 401);
     }
 
