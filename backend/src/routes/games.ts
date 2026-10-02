@@ -4,8 +4,8 @@ import { query } from "../lib/db.js";
 export const gamesRoutes = new Hono();
 
 gamesRoutes.get("/api/games", async (c) => {
-  const search = c.req.query(c.env.DATABASE_URL, "search");
-  const featured = c.req.query(c.env.DATABASE_URL, "featured");
+  const search = c.req.query("search");
+  const featured = c.req.query("featured");
 
   const conditions = ["published = true"];
   const values: string[] = [];
@@ -23,29 +23,29 @@ gamesRoutes.get("/api/games", async (c) => {
     conditions.push("featured = true");
   }
 
-  let result;
   try {
-    result = await query(
-    `select *
-     from games
-     where ${conditions.join(" and ")}
-     order by featured desc, created_at desc`,
-    values,
+    const result = await query(
+      c.env.DATABASE_URL,
+      `select *
+       from games
+       where ${conditions.join(" and ")}
+       order by featured desc, created_at desc`,
+      values,
     );
+
+    return c.json({ games: result.rows });
   } catch (error) {
     return c.json({
       error: error instanceof Error ? error.message : String(error),
-      databaseUrlPresent: Boolean(process.env.DATABASE_URL),
     }, 500);
   }
-
-  return c.json({ games: result.rows });
 });
 
 gamesRoutes.get("/api/games/:slug", async (c) => {
   const slug = c.req.param("slug");
 
   const gameResult = await query(
+    c.env.DATABASE_URL,
     `select *
      from games
      where slug = $1 and published = true
@@ -60,6 +60,7 @@ gamesRoutes.get("/api/games/:slug", async (c) => {
   const game = gameResult.rows[0];
 
   const versionsResult = await query(
+    c.env.DATABASE_URL,
     `select *
      from game_versions
      where game_id = $1
@@ -73,6 +74,7 @@ gamesRoutes.get("/api/games/:slug", async (c) => {
 
   if (versionIds.length > 0) {
     const filesResult = await query(
+      c.env.DATABASE_URL,
       `select *
        from game_files
        where version_id = any($1::uuid[])
