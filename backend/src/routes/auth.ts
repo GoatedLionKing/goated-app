@@ -1,60 +1,58 @@
-import type { FastifyInstance } from "fastify";
-import bcrypt from "bcryptjs";
-import { z } from "zod";
+import { Hono } from "hono";
 import { query } from "../lib/db.js";
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
+export const authRoutes = new Hono();
 
-export async function authRoutes(app: FastifyInstance) {
-  app.post("/api/auth/login", async (request, reply) => {
-    const parsed = loginSchema.safeParse(request.body);
+authRoutes.post("/api/auth/login", async (c) => {
+  try {
+    const body = await c.req.json<{
+      email?: string;
+      password?: string;
+    }>();
 
-    if (!parsed.success) {
-      return reply.code(400).send({
-        error: "Invalid login data",
-      });
+    const email = body.email?.trim().toLowerCase();
+    const password = body.password ?? "";
+
+    if (!email || !password) {
+      return c.json({ error: "Email and password are required" }, 400);
     }
 
-    const { email, password } = parsed.data;
-
-    const result = await query<{ id: string; email: string; password_hash: string }>(
-      `select id, email, password_hash
-       from owners
-       where email = $1
-       limit 1`,
-      [email.toLowerCase()],
+    const result = await query(
+      c.env.DB,
+      `SELECT id, email, password_hash
+       FROM owners
+       WHERE email = ?
+       LIMIT 1`,
+      [email],
     );
 
     if (result.rows.length === 0) {
-      return reply.code(401).send({
-        error: "Invalid email or password",
-      });
+      return c.json({ error: "Invalid credentials" }, 401);
     }
 
-    const owner = result.rows[0];
+    const owner = result.rows[0] as {
+      id: string;
+      email: string;
+      password_hash: string;
+    };
 
-    const valid = await bcrypt.compare(password, owner.password_hash);
-
-    if (!valid) {
-      return reply.code(401).send({
-        error: "Invalid email or password",
-      });
+    if (password !== owner.password_hash) {
+      return c.json({ error: "Invalid credentials" }, 401);
     }
 
-    const token = await app.jwt.sign({
-      ownerId: owner.id,
-      email: owner.email,
-    });
-
-    return {
-      token,
+    return c.json({
+      ok: true,
       owner: {
         id: owner.id,
         email: owner.email,
       },
-    };
-  });
-}
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
+  }
+});
