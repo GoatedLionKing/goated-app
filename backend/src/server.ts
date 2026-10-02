@@ -1,3 +1,4 @@
+console.log("GOATED API STARTING");
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
