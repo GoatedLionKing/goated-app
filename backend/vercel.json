@@ -1,5 +1,4 @@
 {
   "version": 2,
-  "buildCommand": "npm run build && npm run migrate",
-  "outputDirectory": "dist"
+  "buildCommand": "npm run build && npm run migrate"
 }
