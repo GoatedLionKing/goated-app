@@ -1,19 +1,17 @@
 import { neon } from "@neondatabase/serverless";
 
-function getDatabaseUrl() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL is required");
-  }
-  return url;
-}
-
 export async function query<T = Record<string, unknown>>(
+  databaseUrl: string,
   text: string,
   values: unknown[] = [],
 ) {
-  const sql = neon(getDatabaseUrl());
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is required");
+  }
+
+  const sql = neon(databaseUrl);
   const rows = await sql.query(text, values);
+
   return { rows } as { rows: T[] };
 }
 

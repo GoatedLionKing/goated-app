@@ -4,8 +4,8 @@ import { query } from "../lib/db.js";
 export const gamesRoutes = new Hono();
 
 gamesRoutes.get("/api/games", async (c) => {
-  const search = c.req.query("search");
-  const featured = c.req.query("featured");
+  const search = c.req.query(c.env.DATABASE_URL, "search");
+  const featured = c.req.query(c.env.DATABASE_URL, "featured");
 
   const conditions = ["published = true"];
   const values: string[] = [];
