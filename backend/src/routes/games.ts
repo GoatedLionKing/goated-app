@@ -1,87 +1,83 @@
-import type { FastifyInstance } from "fastify";
+import { Hono } from "hono";
 import { query } from "../lib/db.js";
 
-export async function gamesRoutes(app: FastifyInstance) {
-  app.get<{
-    Querystring: {
-      search?: string;
-      featured?: string;
-    };
-  }>("/api/games", async (request) => {
-    const { search, featured } = request.query;
+export const gamesRoutes = new Hono();
 
-    const conditions = ["published = true"];
-    const values: string[] = [];
+gamesRoutes.get("/api/games", async (c) => {
+  const search = c.req.query("search");
+  const featured = c.req.query("featured");
 
-    if (search?.trim()) {
-      values.push(`%${search.trim()}%`);
-      conditions.push(`(
-        title ilike $${values.length}
-        or description ilike $${values.length}
-        or platform_name ilike $${values.length}
-      )`);
-    }
+  const conditions = ["published = true"];
+  const values: string[] = [];
 
-    if (featured === "true") {
-      conditions.push("featured = true");
-    }
+  if (search?.trim()) {
+    values.push(`%${search.trim()}%`);
+    conditions.push(`(
+      title ilike $${values.length}
+      or description ilike $${values.length}
+      or platform_name ilike $${values.length}
+    )`);
+  }
 
-    const result = await query(
+  if (featured === "true") {
+    conditions.push("featured = true");
+  }
+
+  const result = await query(
+    `select *
+     from games
+     where ${conditions.join(" and ")}
+     order by featured desc, created_at desc`,
+    values,
+  );
+
+  return c.json({ games: result.rows });
+});
+
+gamesRoutes.get("/api/games/:slug", async (c) => {
+  const slug = c.req.param("slug");
+
+  const gameResult = await query(
+    `select *
+     from games
+     where slug = $1 and published = true
+     limit 1`,
+    [slug],
+  );
+
+  if (gameResult.rows.length === 0) {
+    return c.json({ error: "Game not found" }, 404);
+  }
+
+  const game = gameResult.rows[0];
+
+  const versionsResult = await query(
+    `select *
+     from game_versions
+     where game_id = $1
+     order by created_at desc`,
+    [game.id],
+  );
+
+  const versionIds = versionsResult.rows.map((version) => version.id);
+
+  let files: unknown[] = [];
+
+  if (versionIds.length > 0) {
+    const filesResult = await query(
       `select *
-       from games
-       where ${conditions.join(" and ")}
-       order by featured desc, created_at desc`,
-      values,
-    );
-
-    return { games: result.rows };
-  });
-
-  app.get<{
-    Params: { slug: string };
-  }>("/api/games/:slug", async (request, reply) => {
-    const gameResult = await query(
-      `select *
-       from games
-       where slug = $1 and published = true
-       limit 1`,
-      [request.params.slug],
-    );
-
-    if (gameResult.rows.length === 0) {
-      return reply.code(404).send({ error: "Game not found" });
-    }
-
-    const game = gameResult.rows[0];
-
-    const versionsResult = await query(
-      `select *
-       from game_versions
-       where game_id = $1
+       from game_files
+       where version_id = any($1::uuid[])
        order by created_at desc`,
-      [game.id],
+      [versionIds],
     );
 
-    const versionIds = versionsResult.rows.map((version) => version.id);
+    files = filesResult.rows;
+  }
 
-    let files: unknown[] = [];
-
-    if (versionIds.length > 0) {
-      const filesResult = await query(
-        `select *
-         from game_files
-         where version_id = any($1::uuid[])
-         order by created_at desc`,
-        [versionIds],
-      );
-
-      files = filesResult.rows;
-    }
-
-    return {
-      game,
-      versions: versionsResult.rows,
-      files,
-    };
+  return c.json({
+    game,
+    versions: versionsResult.rows,
+    files,
   });
-}
+});

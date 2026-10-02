@@ -20,7 +20,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     const { email, password } = parsed.data;
 
-    const result = await query(
+    const result = await query<{ id: string; email: string; password_hash: string }>(
       `select id, email, password_hash
        from owners
        where email = $1

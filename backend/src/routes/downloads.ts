@@ -5,7 +5,7 @@ export async function downloadsRoutes(app: FastifyInstance) {
   app.get<{
     Params: { id: string };
   }>("/api/files/:id/download", async (request, reply) => {
-    const result = await query(
+    const result = await query<{ id: string; external_url: string }>(
       `select
         id,
         name,

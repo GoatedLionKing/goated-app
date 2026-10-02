@@ -1,21 +1,22 @@
-import pg from "pg";
+import { neon } from "@neondatabase/serverless";
 
-const { Pool } = pg;
-
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
+function getDatabaseUrl() {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL is required");
+  }
+  return url;
 }
 
-export const pool = new Pool({
-  connectionString: databaseUrl,
-  max: 10,
-});
-
-export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
+export async function query<T = Record<string, unknown>>(
   text: string,
   values: unknown[] = [],
 ) {
-  return pool.query<T>(text, values);
+  const sql = neon(getDatabaseUrl());
+  const rows = await sql.query(text, values);
+  return { rows } as { rows: T[] };
 }
+
+export const pool = {
+  async end() {},
+};
