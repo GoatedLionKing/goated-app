@@ -7,7 +7,7 @@ app.get("/api/health", (c) => {
   return c.json({
     ok: true,
     service: "goated-api",
-    databaseUrlPresent: Boolean(c.env.DATABASE_URL),
+    database: "d1",
   });
 });
 
