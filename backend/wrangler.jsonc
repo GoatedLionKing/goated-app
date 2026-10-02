@@ -3,5 +3,12 @@
   "name": "goated-app",
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-02",
-  "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"]
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "goated-db",
+      "database_id": "00f724fd-38b1-4e8d-93bd-9fe6578919dd"
+    }
+  ]
 }

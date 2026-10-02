@@ -7,87 +7,100 @@ gamesRoutes.get("/api/games", async (c) => {
   const search = c.req.query("search");
   const featured = c.req.query("featured");
 
-  const conditions = ["published = true"];
-  const values: string[] = [];
+  const conditions = ["published = 1"];
+  const values: unknown[] = [];
 
   if (search?.trim()) {
-    values.push(`%${search.trim()}%`);
-    conditions.push(`(
-      title ilike $${values.length}
-      or description ilike $${values.length}
-      or platform_name ilike $${values.length}
-    )`);
+    const term = `%${search.trim()}%`;
+    values.push(term, term, term);
+    conditions.push(`
+      (
+        title LIKE ?
+        OR description LIKE ?
+        OR platform_name LIKE ?
+      )
+    `);
   }
 
   if (featured === "true") {
-    conditions.push("featured = true");
+    conditions.push("featured = 1");
   }
 
   try {
     const result = await query(
-      c.env.DATABASE_URL,
-      `select *
-       from games
-       where ${conditions.join(" and ")}
-       order by featured desc, created_at desc`,
+      c.env.DB,
+      `SELECT *
+       FROM games
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY featured DESC, created_at DESC`,
       values,
     );
 
     return c.json({ games: result.rows });
   } catch (error) {
-    return c.json({
-      error: error instanceof Error ? error.message : String(error),
-    }, 500);
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
   }
 });
 
 gamesRoutes.get("/api/games/:slug", async (c) => {
   const slug = c.req.param("slug");
 
-  const gameResult = await query(
-    c.env.DATABASE_URL,
-    `select *
-     from games
-     where slug = $1 and published = true
-     limit 1`,
-    [slug],
-  );
-
-  if (gameResult.rows.length === 0) {
-    return c.json({ error: "Game not found" }, 404);
-  }
-
-  const game = gameResult.rows[0];
-
-  const versionsResult = await query(
-    c.env.DATABASE_URL,
-    `select *
-     from game_versions
-     where game_id = $1
-     order by created_at desc`,
-    [game.id],
-  );
-
-  const versionIds = versionsResult.rows.map((version) => version.id);
-
-  let files: unknown[] = [];
-
-  if (versionIds.length > 0) {
-    const filesResult = await query(
-      c.env.DATABASE_URL,
-      `select *
-       from game_files
-       where version_id = any($1::uuid[])
-       order by created_at desc`,
-      [versionIds],
+  try {
+    const gameResult = await query(
+      c.env.DB,
+      `SELECT *
+       FROM games
+       WHERE slug = ? AND published = 1
+       LIMIT 1`,
+      [slug],
     );
 
-    files = filesResult.rows;
-  }
+    if (gameResult.rows.length === 0) {
+      return c.json({ error: "Game not found" }, 404);
+    }
 
-  return c.json({
-    game,
-    versions: versionsResult.rows,
-    files,
-  });
+    const game = gameResult.rows[0];
+
+    const versionsResult = await query(
+      c.env.DB,
+      `SELECT *
+       FROM game_versions
+       WHERE game_id = ?
+       ORDER BY created_at DESC`,
+      [game.id],
+    );
+
+    const files: unknown[] = [];
+
+    for (const version of versionsResult.rows) {
+      const filesResult = await query(
+        c.env.DB,
+        `SELECT *
+         FROM game_files
+         WHERE version_id = ?
+         ORDER BY created_at DESC`,
+        [version.id],
+      );
+
+      files.push(...filesResult.rows);
+    }
+
+    return c.json({
+      game,
+      versions: versionsResult.rows,
+      files,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
+  }
 });
